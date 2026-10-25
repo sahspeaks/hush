@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Hush — private chat &amp; calls</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <!-- Landing -->
+  <section id="landing" class="center" hidden>
+    <div class="card">
+      <div class="logo" aria-hidden="true">🤫</div>
+      <h1>Hush</h1>
+      <p class="lede">Private one-to-one chat and voice calls. No accounts, no history, nothing stored.</p>
+      <ul class="points">
+        <li><strong>End-to-end encrypted.</strong> Messages and audio travel directly between the two browsers over WebRTC (DTLS&nbsp;/&nbsp;SRTP).</li>
+        <li><strong>The server is blind.</strong> It only introduces the two browsers. It never sees your messages, your audio, or the room key.</li>
+        <li><strong>Verified.</strong> Both sides prove they hold the same secret link before anything is sent.</li>
+        <li><strong>Ephemeral.</strong> Close the tab and the conversation is gone.</li>
+      </ul>
+      <button id="createBtn" class="btn primary big" type="button">Create a private room</button>
+      <p class="fine">You'll get a secret link. Send it to one person through a channel you trust.</p>
+    </div>
+  </section>
+
+  <!-- Room -->
+  <section id="room" class="room" hidden>
+    <header class="top">
+      <div class="brand"><span aria-hidden="true">🤫</span> Hush</div>
+      <div id="status" class="status" data-kind="wait" role="status" aria-live="polite">Connecting…</div>
+      <div class="actions">
+        <button id="copyBtn" class="btn ghost" type="button">Copy invite link</button>
+        <button id="leaveBtn" class="btn ghost danger-text" type="button">Leave</button>
+      </div>
+    </header>
+
+    <div id="safety" class="safety" hidden>
+      <span>Safety code</span>
+      <span id="safetyCode" class="code"></span>
+      <span class="hint">Optional extra check: read it aloud on the call. Same code on both screens means nobody is in the middle, even if your link leaked.</span>
+    </div>
+
+    <div class="callbar">
+      <button id="callBtn" class="btn primary" type="button">📞 Start voice call</button>
+      <div id="outgoing" class="callstate" hidden>
+        <span class="pulse" aria-hidden="true"></span> Calling…
+        <button id="cancel" class="btn danger" type="button">Cancel</button>
+      </div>
+      <div id="incoming" class="callstate" hidden>
+        <span class="pulse" aria-hidden="true"></span> Incoming voice call
+        <button id="accept" class="btn ok" type="button">Accept</button>
+        <button id="decline" class="btn danger" type="button">Decline</button>
+      </div>
+      <div id="incall" class="callstate" hidden>
+        <span class="live">● Live</span>
+        <span id="timer" class="timer">00:00</span>
+        <button id="mute" class="btn" type="button" aria-pressed="false">Mute</button>
+        <button id="hangup" class="btn danger" type="button">Hang up</button>
+      </div>
+    </div>
+
+    <ul id="messages" class="messages" aria-live="polite"></ul>
+
+    <form id="composer" class="composer">
+      <textarea id="input" rows="1" maxlength="4000" autocomplete="off" aria-label="Message"></textarea>
+      <button id="sendBtn" class="btn primary" type="submit">Send</button>
+    </form>
+
+    <audio id="remoteAudio" autoplay></audio>
+  </section>
+
+  <!-- Fatal error -->
+  <section id="fatal" class="center" hidden>
+    <div class="card">
+      <h1>Hmm.</h1>
+      <p id="fatalMsg" class="lede"></p>
+      <a href="/" class="btn primary big">Start over</a>
+    </div>
+  </section>
+</body>
+</html>

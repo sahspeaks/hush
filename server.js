@@ -75,6 +75,13 @@ function iceConfig() {
       username,
       credential,
     });
+  } else if (process.env.TURN_URLS && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
+    // Static credentials (hosted TURN providers like Metered). Visible to every visitor.
+    iceServers.push({
+      urls: process.env.TURN_URLS.split(',').map((s) => s.trim()),
+      username: process.env.TURN_USERNAME,
+      credential: process.env.TURN_CREDENTIAL,
+    });
   }
   // RELAY_ONLY=1 hides users' IP addresses from each other (all traffic via TURN).
   return { iceServers, relayOnly: process.env.RELAY_ONLY === '1' };

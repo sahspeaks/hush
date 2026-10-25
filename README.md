@@ -48,6 +48,7 @@ Environment variables:
 | `HSTS=1` | Send Strict-Transport-Security |
 | `STUN_URLS` | STUN servers (default Google's public STUN) |
 | `TURN_URLS`, `TURN_SECRET` | Your TURN server and its shared secret (short-lived credentials are generated per visit) |
+| `TURN_USERNAME`, `TURN_CREDENTIAL` | Fixed TURN credentials from a hosted provider (used with `TURN_URLS` when `TURN_SECRET` isn't set) |
 | `RELAY_ONLY=1` | Force all traffic through TURN so the two users never learn each other's IP address |
 
 ### TURN (strongly recommended for real use)

@@ -14,15 +14,15 @@
     <div class="card">
       <div class="logo" aria-hidden="true">🤫</div>
       <h1>Hush</h1>
-      <p class="lede">Private one-to-one chat and voice calls. No accounts, no history, nothing stored.</p>
+      <p class="lede">Private group chat, voice and video calls for up to 6 people. No accounts, no history, nothing stored.</p>
       <ul class="points">
-        <li><strong>End-to-end encrypted.</strong> Messages and audio travel directly between the two browsers over WebRTC (DTLS&nbsp;/&nbsp;SRTP).</li>
-        <li><strong>The server is blind.</strong> It only introduces the two browsers. It never sees your messages, your audio, or the room key.</li>
-        <li><strong>Verified.</strong> Both sides prove they hold the same secret link before anything is sent.</li>
+        <li><strong>End-to-end encrypted.</strong> Messages, audio and video travel directly between browsers over WebRTC (DTLS&nbsp;/&nbsp;SRTP).</li>
+        <li><strong>The server is blind.</strong> It only introduces the browsers to each other. It never sees your messages, your audio or video, or the room key.</li>
+        <li><strong>Verified.</strong> Everyone proves they hold the same secret link before anything is sent to them.</li>
         <li><strong>Ephemeral.</strong> Close the tab and the conversation is gone.</li>
       </ul>
       <button id="createBtn" class="btn primary big" type="button">Create a private room</button>
-      <p class="fine">You'll get a secret link. Send it to one person through a channel you trust.</p>
+      <p class="fine">You'll get a secret link. Send it to the people you want to talk to, through a channel you trust.</p>
     </div>
   </section>
 
@@ -37,30 +37,32 @@
       </div>
     </header>
 
-    <div id="safety" class="safety" hidden>
-      <span>Safety code</span>
-      <span id="safetyCode" class="code"></span>
-      <span class="hint">Optional extra check: read it aloud on the call. Same code on both screens means nobody is in the middle, even if your link leaked.</span>
-    </div>
+    <details id="people" class="people">
+      <summary><span id="peopleCount">Just you</span> <span class="hint">· names &amp; safety codes</span></summary>
+      <div class="people-body">
+        <label class="myname">Your name <input id="nameInput" maxlength="32" autocomplete="off" spellcheck="false"></label>
+        <ul id="peopleList" class="plist"></ul>
+        <p class="hint">Each person shares a safety code with you. If you both see the same code (read it aloud on a call), nobody is in the middle between you, even if the invite link leaked.</p>
+      </div>
+    </details>
 
     <div class="callbar">
-      <button id="callBtn" class="btn primary" type="button">📞 Start voice call</button>
-      <div id="outgoing" class="callstate" hidden>
-        <span class="pulse" aria-hidden="true"></span> Calling…
-        <button id="cancel" class="btn danger" type="button">Cancel</button>
-      </div>
-      <div id="incoming" class="callstate" hidden>
-        <span class="pulse" aria-hidden="true"></span> Incoming voice call
-        <button id="accept" class="btn ok" type="button">Accept</button>
-        <button id="decline" class="btn danger" type="button">Decline</button>
+      <div id="idlecall" class="callstate">
+        <button id="joinVoice" class="btn primary" type="button">📞 Voice call</button>
+        <button id="joinVideo" class="btn primary" type="button">🎥 Video call</button>
+        <span id="callInfo" class="callinfo"></span>
       </div>
       <div id="incall" class="callstate" hidden>
         <span class="live">● Live</span>
         <span id="timer" class="timer">00:00</span>
         <button id="mute" class="btn" type="button" aria-pressed="false">Mute</button>
-        <button id="hangup" class="btn danger" type="button">Hang up</button>
+        <button id="camBtn" class="btn" type="button">Camera on</button>
+        <button id="flipBtn" class="btn" type="button" hidden aria-label="Switch camera">🔄 Flip</button>
+        <button id="leaveCall" class="btn danger" type="button">Leave call</button>
       </div>
     </div>
+
+    <div id="stage" class="stage" hidden></div>
 
     <ul id="messages" class="messages" aria-live="polite"></ul>
 
@@ -69,7 +71,7 @@
       <button id="sendBtn" class="btn primary" type="submit">Send</button>
     </form>
 
-    <audio id="remoteAudio" autoplay></audio>
+    <div id="audios" hidden></div>
   </section>
 
   <!-- Fatal error -->

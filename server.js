@@ -5,9 +5,9 @@
  * This server never sees chat messages, audio, or the room secret.
  * It only:
  *   1. serves the static web app,
- *   2. pairs two browsers that present the same room id (a SHA-256 hash of the secret),
- *   3. relays WebRTC offer/answer/ICE messages between them.
- * After that, all chat and audio flows peer-to-peer, encrypted with DTLS/SRTP.
+ *   2. groups up to MAX_PEERS browsers that present the same room id (an HMAC of the secret),
+ *   3. relays WebRTC offer/answer/ICE messages between each pair of them (a full mesh).
+ * After that, all chat, audio and video flows peer-to-peer, encrypted with DTLS/SRTP.
  */
 const http = require('http');
 const fs = require('fs');
@@ -21,9 +21,11 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map((s) => s.trim()).filter(Boolean);
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const MAX_CONN_PER_IP = Number(process.env.MAX_CONN_PER_IP) || 20;
+// Every browser uploads its media to every other one, so keep groups small.
+const MAX_PEERS = Math.min(Math.max(Number(process.env.MAX_PEERS) || 6, 2), 12);
 
-// Token-bucket rate limit per socket (ICE gathering bursts a few dozen messages).
-const BUCKET_MAX = 100;
+// Token-bucket rate limit per socket (ICE gathering bursts a few dozen messages per peer).
+const BUCKET_MAX = 200;
 const REFILL_PER_SEC = 20;
 
 const MIME = {
@@ -49,7 +51,7 @@ const SECURITY_HEADERS = {
   ].join('; '),
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'microphone=(self), camera=(), geolocation=(), payment=()',
+  'Permissions-Policy': 'microphone=(self), camera=(self), geolocation=(), payment=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
@@ -133,7 +135,7 @@ const server = http.createServer((req, res) => {
 });
 
 // ---------- WebSocket signaling ----------
-/** roomId -> Set<WebSocket> (max 2) */
+/** roomId -> Map<peerId, WebSocket> (max MAX_PEERS) */
 const rooms = new Map();
 /** ip -> open connection count */
 const ipCounts = new Map();
@@ -152,13 +154,6 @@ function send(ws, msg) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
 }
 
-function peerOf(ws) {
-  const set = rooms.get(ws.room);
-  if (!set) return null;
-  for (const p of set) if (p !== ws) return p;
-  return null;
-}
-
 function allow(ws) {
   const now = Date.now();
   ws.tokens = Math.min(BUCKET_MAX, ws.tokens + ((now - ws.lastRefill) / 1000) * REFILL_PER_SEC);
@@ -173,37 +168,38 @@ function join(ws, room) {
   if (typeof room !== 'string' || !/^[0-9a-f]{64}$/.test(room)) {
     return send(ws, { type: 'error', message: 'bad room id' });
   }
-  let set = rooms.get(room);
-  if (!set) {
-    set = new Set();
-    rooms.set(room, set);
+  let members = rooms.get(room);
+  if (!members) {
+    members = new Map();
+    rooms.set(room, members);
   }
-  if (set.size >= 2) return send(ws, { type: 'full' });
+  if (members.size >= MAX_PEERS) return send(ws, { type: 'full', max: MAX_PEERS });
 
-  set.add(ws);
+  const id = crypto.randomBytes(8).toString('hex');
+  send(ws, { type: 'joined', id, peers: [...members.keys()] }); // the newcomer makes the offers
+  for (const p of members.values()) send(p, { type: 'peer-joined', id });
+  members.set(id, ws);
   ws.room = room;
-  if (set.size === 1) {
-    send(ws, { type: 'waiting' });
-  } else {
-    send(ws, { type: 'joined' });
-    send(peerOf(ws), { type: 'peer-joined' }); // the earlier peer makes the offer
-  }
+  ws.id = id;
 }
 
 function leave(ws) {
   if (!ws.room) return;
-  const set = rooms.get(ws.room);
-  if (set) {
-    set.delete(ws);
-    if (set.size === 0) rooms.delete(ws.room);
-    else for (const p of set) send(p, { type: 'peer-left' });
+  const members = rooms.get(ws.room);
+  if (members) {
+    members.delete(ws.id);
+    if (members.size === 0) rooms.delete(ws.room);
+    else for (const p of members.values()) send(p, { type: 'peer-left', id: ws.id });
   }
   ws.room = null;
+  ws.id = null;
 }
 
-function relay(ws, msg) {
-  if (!ws.room) return;
-  send(peerOf(ws), msg);
+/** Forward a handshake message to one other member of the same room. */
+function relay(ws, to, msg) {
+  if (!ws.room || typeof to !== 'string' || to === ws.id) return;
+  const target = rooms.get(ws.room)?.get(to);
+  if (target) send(target, { ...msg, from: ws.id });
 }
 
 wss.on('connection', (ws, req) => {
@@ -235,12 +231,12 @@ wss.on('connection', (ws, req) => {
       case 'answer': {
         const d = m.sdp;
         if (!d || d.type !== m.type || typeof d.sdp !== 'string') return;
-        return relay(ws, { type: m.type, sdp: { type: d.type, sdp: d.sdp } });
+        return relay(ws, m.to, { type: m.type, sdp: { type: d.type, sdp: d.sdp } });
       }
       case 'ice': {
         const c = m.candidate;
         if (!c || typeof c !== 'object' || typeof c.candidate !== 'string') return;
-        return relay(ws, {
+        return relay(ws, m.to, {
           type: 'ice',
           candidate: {
             candidate: c.candidate,
